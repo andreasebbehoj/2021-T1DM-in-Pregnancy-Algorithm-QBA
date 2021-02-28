@@ -1,0 +1,22 @@
+algonumber	algoname	algo	algo_text	tp	fp	fn	tn	total	algo_ppv	algo_sen
+1	1	1	any diabetes diagnosis registered before delivery in the index pregnancy and registered before age of 30	909	429	75	405744	407157	.67937219	.9237805
+1	1a	1a	redeemed a prescription of insulin	909	276	75	405897	407157	.76708859	.9237805
+1	1b	1b	redeemed a prescription of insulin before oral antidiabetics	897	243	87	405930	407157	.78684211	.91158539
+1	1c	1c	redeemed a prescription of insulin and never redeemed a prescription of oral antidiabetics	832	185	152	405988	407157	.81809241	.84552848
+1	1d	1d	never redeemed a prescription of oral antidiabetics	909	432	75	405741	407157	.67785233	.9237805
+1	1e	1e	never given a diagnosis of GDM in the index pregnancy	871	374	113	405799	407157	.69959837	.88516259
+1	1f	1f	never redeemed a prescription of oral antidiabetics and who were never given a diagnosis of GDM in the index pregnancy	826	300	158	405873	407157	.73357016	.83943087
+2	2	2	specific type 1 diabetes diagnosis registered before delivery regardless of maternal age in the index pregnancy	909	266	75	405907	407157	.77361703	.9237805
+2	2a	2a	redeemed a prescription of insulin	909	242	75	405931	407157	.78974807	.9237805
+2	2b	2b	redeemed a prescription of insulin before oral antidiabetics	900	298	84	405875	407157	.75125211	.91463417
+2	2c	2c	redeemed a prescription of insulin and never redeemed a prescription of oral antidiabetics	830	118	154	406055	407157	.87552744	.84349591
+2	2d	2d	never redeemed a prescription of oral antidiabetics	830	209	154	405964	407157	.79884505	.84349591
+2	2e	2e	never given a diagnosis of GDM in the index pregnancy	858	209	126	405964	407157	.8041237	.87195122
+2	2f	2f	never redeemed a prescription of oral antidiabetics and who were never given a diagnosis of GDM in the index pregnancy	787	177	197	405996	407157	.81639004	.79979676
+3	3	3	a specific “type 1 diabetes in pregnancy” diagnosis registered before delivery in the index pregnancy	831	434	153	405739	407157	.65691698	.84451222
+3	3a	3a	redeemed a prescription of insulin	831	330	153	405843	407157	.71576226	.84451222
+3	3b	3b	redeemed a prescription of insulin before oral antidiabetics	820	284	164	405889	407157	.74275362	.83333331
+3	3c	3c	redeemed a prescription of insulin and never redeemed a prescription of oral antidiabetics	751	191	233	405982	407157	.7972399	.76321137
+3	3d	3d	never redeemed a prescription of oral antidiabetics	751	258	233	405915	407157	.74430126	.76321137
+3	3e	3e	never given a diagnosis of GDM in the index pregnancy	798	282	186	405891	407157	.73888886	.81097561
+3	3f	3f	never redeemed a prescription of oral antidiabetics and who were never given a diagnosis of GDM in the index pregnancy	724	189	260	405984	407157	.79299015	.73577237

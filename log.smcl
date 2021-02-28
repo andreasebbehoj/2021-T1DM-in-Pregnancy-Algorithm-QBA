@@ -1,0 +1,716 @@
+{smcl}
+{com}{sf}{ul off}{txt}{.-}
+      name:  {res}<unnamed>
+       {txt}log:  {res}C:\Users\au335571\Forskning\2020-T1DM-algorithm-QBA\log_28 Feb 2021.smcl
+  {txt}log type:  {res}smcl
+ {txt}opened on:  {res}28 Feb 2021, 17:25:58
+{txt}
+{com}. 
+. *** Setup 
+. * General settings
+. version 16.1
+{txt}
+{com}. clear
+{txt}
+{com}. 
+. /* Install dependencies
+> ssc install grstyle, replace
+> ssc install palettes, replace
+> ssc install colrspace, replace
+> */
+. 
+. * Define programs
+. do 1_diagtvar.do
+{txt}
+{com}. ***** diagtcol.do *****
+. /* Define programs for calculating PPV and sensitivity by n_col */
+. capture: program drop diagtcol
+{txt}
+{com}. 
+. program define diagtcol 
+{txt}  1{com}. syntax varlist(min=4 max=4 numeric) [if], [prefix(name) suffix(name)] 
+{txt}  2{com}. 
+. 
+. /*** Define input vars
+> #a #b #c #d are, respectively, the numbers of true positives 
+> (diseased subjects with correct positive test results), false negatives 
+> (disease, but negative test), false positives (no disease, but positive 
+> test) and true negatives (no disease, negative test).
+> */
+. 
+. local tp = word("`varlist'", 1)
+{txt}  3{com}. local fn = word("`varlist'", 2)
+{txt}  4{com}. local fp = word("`varlist'", 3)
+{txt}  5{com}. local tn = word("`varlist'", 4)
+{txt}  6{com}. 
+. di "tp: `tp', fn: `fn', fp: `fp', tn: `tn'"
+{txt}  7{com}. 
+. *** Check for errors
+. if mi("`prefix'") & mi("`suffix'") {c -(}
+{txt}  8{com}.     di as error "Either prefix or suffix must be provided"
+{txt}  9{com}.         exit
+{txt} 10{com}. {c )-}
+{txt} 11{com}. 
+. 
+. *** New var names
+. local newppv = "`prefix'ppv`suffix'"
+{txt} 12{com}. local newsen = "`prefix'sen`suffix'"
+{txt} 13{com}. 
+. *** Calculations
+. ** PPV
+. gen `newppv' = `tp'/(`tp'+`fp') `if'
+{txt} 14{com}. 
+. ** Sensitivity
+. gen `newsen' = `tp'/(`tp'+`fn') `if'
+{txt} 15{com}. 
+. end
+{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. do 1_fptnmover.do
+{txt}
+{com}. ***** fptnmover.do *****
+. /* Define programs for calculating PPV and sens by n_col */
+. capture: program drop fptnmover
+{txt}
+{com}. 
+. program define fptnmover
+{txt}  1{com}. syntax varlist(min=4 max=4 numeric) [if], [prefix(name) suffix(name)] Nmove(integer) PROPFP(real) PROPMAXfp(real)
+{txt}  2{com}. 
+. /*** Define input vars
+> #a #b #c #d are, respectively, the numbers of true positives 
+> (diseased subjects with correct positive test results), false negatives 
+> (disease, but negative test), false positives (no disease, but positive 
+> test) and true negatives (no disease, negative test).
+> 
+>                         | Gold-standard |
+>                         | True  | False |
+> ------------|-------|-------|
+>                 Pos |  TP       |  FP   |
+> Test    ----|-------|-------|
+>                 Neg     |  FN   |  TN   |
+> ------------|-------|-------|
+>         
+> Moves #nmove persons from right to left column:
+>         #nmove*#propfp are moved from FP (up to a limit of #propfpmax * FP)
+>         #nmove-(#nmove*#propfp) are moved from TN
+> 
+> */
+. 
+. 
+. local tp = word("`varlist'", 1)
+{txt}  3{com}. local fn = word("`varlist'", 2)
+{txt}  4{com}. local fp = word("`varlist'", 3)
+{txt}  5{com}. local tn = word("`varlist'", 4)
+{txt}  6{com}. 
+. di "tp: `tp', fn: `fn', fp: `fp', tn: `tn'"
+{txt}  7{com}. 
+. *** Check for errors
+. if inrange(`propfp', 0, 1)==0 | inrange(`propmaxfp', 0, 1)==0 {c -(}
+{txt}  8{com}.     di as error "Invalid parameters. Proportions must be between 0 and 1" 
+{txt}  9{com}.         exit 198
+{txt} 10{com}. {c )-}
+{txt} 11{com}. 
+. if mi("`prefix'") & mi("`suffix'") {c -(}
+{txt} 12{com}.     di as error "Either prefix or suffix must be provided"
+{txt} 13{com}.         exit
+{txt} 14{com}. {c )-}
+{txt} 15{com}. 
+. *** New var names
+. foreach var in label movefp movetn {c -(}
+{txt} 16{com}.         local `var' = "`prefix'`var'`suffix'"
+{txt} 17{com}. {c )-}
+{txt} 18{com}. foreach var in tp fn fp tn {c -(}
+{txt} 19{com}.         local new`var' = "`prefix'`var'`suffix'"
+{txt} 20{com}. {c )-}
+{txt} 21{com}. 
+. *** Calculate new values
+. * N to move from FP and TN
+. gen `movefp' = cond(`fp'*`propmaxfp'>(`nmove'*`propfp'), /// If #nmiss * #propfp < #propmaxfp % of #fp 
+>                                         `nmove'*`propfp', /// then take #nmiss * #propfp
+>                                         `fp'*`propmaxfp') // else take #propmaxfp * #fp
+{txt} 22{com}. replace `movefp'=round(`movefp')
+{txt} 23{com}. 
+. gen `movetn' = `nmove'-`movefp' // #nmove-movefp
+{txt} 24{com}. assert `nmove'==(`movefp'+`movetn')
+{txt} 25{com}. 
+. ** Calc new counts
+. gen `newfp' = `fp'-`movefp'
+{txt} 26{com}. gen `newtp' = `tp'+`movefp'
+{txt} 27{com}. 
+. gen `newtn' = `tn'-`movetn'
+{txt} 28{com}. gen `newfn' = `fn'+`movetn'
+{txt} 29{com}. assert `tp'+`fn'+`fp'+`tn'==(`newtp'+`newfn'+`newfp'+`newtn') // Old total == new total
+{txt} 30{com}. 
+. ** Order
+. order `movefp' `movetn' `newtp' `newfp' `newfn' `newtn', last
+{txt} 31{com}. 
+. ** Label var
+. local text_perfp = `propfp'*100
+{txt} 32{com}. local text_permaxfp = `propmaxfp'*100
+{txt} 33{com}. gen `label' = "N=`nmove', `text_perfp'% from FP, max `text_permaxfp'%", before(`movefp')
+{txt} 34{com}. 
+. 
+. end
+{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. 
+. 
+. *** Import uncorrected values
+. do 2_Import.do
+{txt}
+{com}. ***** 2_Import.do *****
+. /* 
+> Import number of TP, FP, FN, and TN for each algorithm and calculate uncorrected PPV and completeness
+> */
+. 
+. import excel "InputData/tab2data.xlsx", sheet("Sheet1") firstrow clear
+{res}{text}(6 vars, 22 obs)
+
+{com}. 
+. ** Var names
+. ds
+{txt}{col 1}algo{col 12}algo_text{col 23}tp{col 34}fp{col 45}fn{col 56}tn
+
+{com}. foreach var in `r(varlist)' {c -(}
+{txt}  2{com}.         local lab = `var'[1]
+{txt}  3{com}.         label var `var' "`lab'"
+{txt}  4{com}. {c )-}
+{txt}
+{com}. drop if _n==1
+{txt}(1 observation deleted)
+
+{com}. 
+. ** Format 
+. foreach var in tp fp fn tn {c -(}
+{txt}  2{com}.         destring `var', replace
+{txt}  3{com}. {c )-}
+{txt}tp: all characters numeric; {res}replaced {txt}as {res}int
+{txt}fp: all characters numeric; {res}replaced {txt}as {res}int
+{txt}fn: all characters numeric; {res}replaced {txt}as {res}int
+{txt}tn: all characters numeric; {res}replaced {txt}as {res}long
+{txt}
+{com}. 
+. ** Algo labels
+. replace algo_text = substr(algo_text, strpos(algo_text, ". ")+2, .)
+{txt}(21 real changes made)
+
+{com}. 
+. gen algoname = _n, before(algo)
+{txt}
+{com}. labmask algoname, values(algo)
+{txt}
+{com}. 
+. gen algonumber = real(substr(algo, 1, 1)), before(algoname)
+{txt}
+{com}. 
+. 
+. *** Calculate uncorrected PPV and sens
+. egen total = rowtotal(tp fp fn tn)
+{txt}
+{com}. diagtcol tp fn fp tn, prefix("algo_")
+tp: tp, fn: fn, fp: fp, tn: tn
+{txt}
+{com}. 
+. 
+. *** Save
+. save OutputData/uncorrected.dta, replace
+{txt}file OutputData/uncorrected.dta saved
+
+{com}. export delimited using OutputData/uncorrected.csv, replace delim(tab)
+{res}{txt}file OutputData/uncorrected.csv saved
+
+{com}. 
+{txt}end of do-file
+
+{com}. 
+. 
+. *** Calculate corrected values
+. do 3_CalcCorrected.do
+{txt}
+{com}. ***** 3_CalcCorrected.do *****
+. /*
+> Calculate new corrected values of TP, FP, FN, and TN by moving a number of patients from right to left column:
+>                         | EPICOM cohort |
+>                         | True  | False |
+> ------------|-------|-------|
+>                 Pos |  TP       |  FP   |
+> Algo    ----|-------|-------|
+>                 Neg     |  FN   |  TN   |
+> ------------|-------|-------|
+> 
+> Assumptions:
+> Either 74 or 328 patients will be moved. 
+> 
+> Either 0%, 100% or best estimate" (76%) will be assumed to algo positive (moved from FP to TP). "Best estimate" is defined as average uncorrected PPV of all algorithms
+> 
+> The maximum number of FP that can be moved is limited to 76% of the uncorrected FP. Example: an algorithm have an uncorrected number of 100 FP. If moving 328 patients, a maximum of 76 are moved from FP to TP while the remaining 328-76 are moved from TN to FN.
+> 
+> */
+. 
+. use OutputData/uncorrected.dta, clear 
+{txt}
+{com}. 
+. 
+. *** Define algo positive values 
+. su algo_ppv
+
+{txt}    Variable {c |}        Obs        Mean    Std. Dev.       Min        Max
+{hline 13}{c +}{hline 57}
+{space 4}algo_ppv {c |}{res}         21    .7600368    .0542763    .656917   .8755274
+{txt}
+{com}. global ppv_ave = round(`r(mean)', 0.001)
+{txt}
+{com}. 
+. global algoposprop = "0 $ppv_ave 1" // 0%, best estimate and 100% algo pos
+{txt}
+{com}. 
+. 
+. *** Move N from FP and TN
+. foreach n in 74 328 {c -(} // Loop over N to move
+{txt}  2{com}.         foreach proppos of global algoposprop {c -(} // Loop over algo-pos 
+{txt}  3{com}.                 di _col(5) "N=`n'" _col(15) "PropFP=`proppos'"
+{txt}  4{com}.                 local proptext = string(round(`proppos'*100, 1), "%4.0f")
+{txt}  5{com}.                 di "`proptext'"
+{txt}  6{com}.                 qui: fptnmover tp fn fp tn, ///
+>                         nmove(`n') /// N to move
+>                         propfp(`proppos') /// assumed algo-pos
+>                         propmaxfp($ppv_ave) /// maximum prop FP that can be moved
+>                         suffix("_`n'_`proptext'") 
+{txt}  7{com}.         {c )-}
+{txt}  8{com}. {c )-}
+{col 5}N=74{col 15}PropFP=0
+0
+{col 5}N=74{col 15}PropFP=.76
+76
+{col 5}N=74{col 15}PropFP=1
+100
+{col 5}N=328{col 15}PropFP=0
+0
+{col 5}N=328{col 15}PropFP=.76
+76
+{col 5}N=328{col 15}PropFP=1
+100
+{txt}
+{com}. 
+. *** Calculate corrected PPV and completeness
+. * Reshape
+. reshape long label_ movefp_ movetn_ tp_ fp_ fn_ tn_, i(algonumber algoname) j(x) string
+{txt}(note: j = 328_0 328_100 328_76 74_0 74_100 74_76)
+
+Data{col 36}wide{col 43}->{col 48}long
+{hline 77}
+Number of obs.                 {res}      21   {txt}->{res}     126
+{txt}Number of variables            {res}      53   {txt}->{res}      19
+{txt}j variable (6 values)                     ->   {res}x
+{txt}xij variables:
+{res}label_328_0 label_328_100 ... label_74_76 {txt}->   {res}label_
+movefp_328_0 movefp_328_100 ... movefp_74_76{txt}-> {res}movefp_
+movetn_328_0 movetn_328_100 ... movetn_74_76{txt}-> {res}movetn_
+       tp_328_0 tp_328_100 ... tp_74_76   {txt}->   {res}tp_
+       fp_328_0 fp_328_100 ... fp_74_76   {txt}->   {res}fp_
+       fn_328_0 fn_328_100 ... fn_74_76   {txt}->   {res}fn_
+       tn_328_0 tn_328_100 ... tn_74_76   {txt}->   {res}tn_
+{txt}{hline 77}
+
+{com}. 
+. * Gen vars
+. gen move_n=real(substr(x, 1, strpos(x, "_")-1)), after(x)
+{txt}
+{com}. gen move_per=real(substr(x, strpos(x, "_")+1, .)), after(move_n)
+{txt}
+{com}. 
+. sort algoname move_n move_per
+{txt}
+{com}. gen row=_n, before(algonumber)
+{txt}
+{com}. 
+. * Calculate PPV and completeness
+. diagtcol tp_ fn_ fp_ tn_, prefix("corr_")
+tp: tp_, fn: fn_, fp: fp_, tn: tn_
+{txt}
+{com}. 
+. 
+. *** Save results
+. save OutputData/corrected.dta, replace
+{txt}file OutputData/corrected.dta saved
+
+{com}. export delimited using OutputData/corrected.csv, replace delim(tab)
+{res}{txt}file OutputData/corrected.csv saved
+
+{com}. 
+{txt}end of do-file
+
+{com}. 
+. 
+. *** Present results
+. do 4_Graph.do
+{txt}
+{com}. ***** 4_Graph.do *****
+. 
+. *** Graph settings
+. ** General
+. set scheme s2color
+{txt}
+{com}. grstyle init graphlayout, replace
+{res}{txt}
+{com}. grstyle set plain // No plot region color, white background + other tweaks
+{txt}
+{com}. 
+. ** Size
+. grstyle set graphsize 560pt 560pt // in pixels, default is 5.5 inches *72 pt/inch = 396pt
+{txt}
+{com}. grstyle set symbolsize medium
+{txt}
+{com}. grstyle set size 25pt: axis_title // X and Y axis text size
+{txt}
+{com}. 
+. ** Axis
+. grstyle anglestyle vertical_tick horizontal // Horizontal "tick"text on y-axis
+{txt}
+{com}. grstyle color major_grid gs11 // colour of horizontal lines
+{txt}
+{com}. 
+. ** Legend
+. grstyle set legend ///
+>         10, /// clock position of legend (1-12).
+>         nobox /// no legend background
+>         inside // inside plotregion
+{txt}
+{com}. 
+. ** Settings for each subgraph
+. local layout1 = "msymbol(O)"
+{txt}
+{com}. local layout2 = "msymbol(D)"
+{txt}
+{com}. local layout3 = "msymbol(T)"
+{txt}
+{com}. 
+. 
+. *** Make graphs
+. use OutputData/corrected, clear
+{txt}
+{com}. qui: levelsof algonumber, local(algonumbers)
+{txt}
+{com}. qui: levelsof algoname, local(algonames)
+{txt}
+{com}. qui: levelsof move_n, local(subcats)
+{txt}
+{com}. 
+. gen labshort = string(move_per) + "%"
+{txt}
+{com}. 
+. foreach algoname of local algonames {c -(} // Loop over subalgorithms
+{txt}  2{com}.         ** Data for subalgo graph
+.         qui: su row if algoname==`algoname'
+{txt}  3{com}.         local title : label algoname `algoname'
+{txt}  4{com}.         local subtitle = algo_text[`r(min)']
+{txt}  5{com}.         local sens = algo_sen[`r(min)'] // uncorrected value
+{txt}  6{com}.         local ppv = algo_ppv[`r(min)'] // uncorrected value
+{txt}  7{com}.         di "`title' - `subtitle'"
+{txt}  8{com}.         
+.         ** Graph by N moved 
+.         local twoway = ""
+{txt}  9{com}.         local label = ""
+{txt} 10{com}.         local x = 1
+{txt} 11{com}.         foreach n of local subcats {c -(}
+{txt} 12{com}.                 local twoway = "`twoway' (scatter corr_ppv corr_sen if algoname==`algoname' & move_n==`n'" ///
+>                 + ", mcolor() mlabel(labshort) mlabsize(small) `layout`x'')"
+{txt} 13{com}.                 local label = `" `x' "N=`n' moved" `label' "'
+{txt} 14{com}.                 
+.                 local x =`x'+1
+{txt} 15{com}.         {c )-}
+{txt} 16{com}.         
+.         ** Graph
+.         twoway `twoway' ///
+>                 (scatteri `ppv' `sens', `layout`x'') /// PPV and sens without correction
+>                 , xlabel(0.5(0.1)1.0) ylabel(0.6(0.1)1.0) ytick(0.6(0.1)1.0) ///
+>                 title("Algorithm `title'") ///
+>                 subtitle("`subtitle'", size(1.5)) ///
+>                 xtitle("Completeness in %") ytitle("PPV in %") ///
+>                 legend(ring(0) position(10) order(`label' 3 "Uncorrected") ) ///
+>                 name("algo_`algoname'", replace)
+{txt} 17{com}.         qui: graph export OutputFigures/algo_`algoname'.png, replace
+{txt} 18{com}. {c )-}
+1 - any diabetes diagnosis registered before delivery in the index pregnancy and registered before age of 30
+{res}1a - redeemed a prescription of insulin
+1b - redeemed a prescription of insulin before oral antidiabetics
+1c - redeemed a prescription of insulin and never redeemed a prescription of oral antidiabetics
+1d - never redeemed a prescription of oral antidiabetics
+1e - never given a diagnosis of GDM in the index pregnancy
+1f - never redeemed a prescription of oral antidiabetics and who were never given a diagnosis of GDM in the index pregnancy
+2 - specific type 1 diabetes diagnosis registered before delivery regardless of maternal age in the index pregnancy
+2a - redeemed a prescription of insulin
+2b - redeemed a prescription of insulin before oral antidiabetics
+2c - redeemed a prescription of insulin and never redeemed a prescription of oral antidiabetics
+2d - never redeemed a prescription of oral antidiabetics
+2e - never given a diagnosis of GDM in the index pregnancy
+2f - never redeemed a prescription of oral antidiabetics and who were never given a diagnosis of GDM in the index pregnancy
+3 - a specific “type 1 diabetes in pregnancy” diagnosis registered before delivery in the index pregnancy
+3a - redeemed a prescription of insulin
+3b - redeemed a prescription of insulin before oral antidiabetics
+3c - redeemed a prescription of insulin and never redeemed a prescription of oral antidiabetics
+3d - never redeemed a prescription of oral antidiabetics
+3e - never given a diagnosis of GDM in the index pregnancy
+3f - never redeemed a prescription of oral antidiabetics and who were never given a diagnosis of GDM in the index pregnancy
+{txt}
+{com}. 
+. ** Combine figures
+. qui: levelsof algonumber, local(algonumbers)
+{txt}
+{com}. foreach algonumber of local algonumbers {c -(}
+{txt}  2{com}.         local combine = ""
+{txt}  3{com}.         levelsof algoname if algonumber==`algonumber', local(algonames)
+{txt}  4{com}.         foreach algoname of local algonames {c -(}
+{txt}  5{com}.                 local combine = "`combine' algo_`algoname'"
+{txt}  6{com}.         {c )-}
+{txt}  7{com}.         di "`combine'"
+{txt}  8{com}.         graph combine `combine', altshrink name(comb_`algonumber', replace) col(2) ysize(297mm) xsize(210mm)
+{txt}  9{com}.         graph export OutputFigures/comb_`algonumber'.png, replace
+{txt} 10{com}. {c )-}
+{res}{txt}1 2 3 4 5 6 7
+ algo_1 algo_2 algo_3 algo_4 algo_5 algo_6 algo_7
+{res}{p 0 4 2}
+{txt}(note:  named style
+210mm not found in class
+graphsize,  default attributes used)
+{p_end}
+{p 0 4 2}
+{txt}(note:  named style
+5 not found in class
+graphsize,  default attributes used)
+{p_end}
+{p 0 4 2}
+{txt}(note:  named style
+297mm not found in class
+graphsize,  default attributes used)
+{p_end}
+{p 0 4 2}
+{txt}(note:  named style
+5 not found in class
+graphsize,  default attributes used)
+{p_end}
+(file OutputFigures/comb_1.png written in PNG format)
+{res}{txt}8 9 10 11 12 13 14
+ algo_8 algo_9 algo_10 algo_11 algo_12 algo_13 algo_14
+{res}{p 0 4 2}
+{txt}(note:  named style
+210mm not found in class
+graphsize,  default attributes used)
+{p_end}
+{p 0 4 2}
+{txt}(note:  named style
+5 not found in class
+graphsize,  default attributes used)
+{p_end}
+{p 0 4 2}
+{txt}(note:  named style
+297mm not found in class
+graphsize,  default attributes used)
+{p_end}
+{p 0 4 2}
+{txt}(note:  named style
+5 not found in class
+graphsize,  default attributes used)
+{p_end}
+(file OutputFigures/comb_2.png written in PNG format)
+{res}{txt}15 16 17 18 19 20 21
+ algo_15 algo_16 algo_17 algo_18 algo_19 algo_20 algo_21
+{res}{p 0 4 2}
+{txt}(note:  named style
+210mm not found in class
+graphsize,  default attributes used)
+{p_end}
+{p 0 4 2}
+{txt}(note:  named style
+5 not found in class
+graphsize,  default attributes used)
+{p_end}
+{p 0 4 2}
+{txt}(note:  named style
+297mm not found in class
+graphsize,  default attributes used)
+{p_end}
+{p 0 4 2}
+{txt}(note:  named style
+5 not found in class
+graphsize,  default attributes used)
+{p_end}
+(file OutputFigures/comb_3.png written in PNG format)
+
+{com}. 
+{txt}end of do-file
+
+{com}. do 4_Table.do
+{txt}
+{com}. ***** 4_Table.do *****
+. use OutputData/corrected.dta, clear
+{txt}
+{com}. 
+. 
+. *** Summarize PPV and compleness by Nmove
+. * Add duplicates vars for collapse
+. rename corr_ppv corr_ppv_med
+{res}{txt}
+{com}. rename corr_sen corr_sen_med
+{res}{txt}
+{com}. 
+. foreach var in min max {c -(}
+{txt}  2{com}.     gen corr_ppv_`var' = corr_ppv_med
+{txt}  3{com}.         gen corr_sen_`var' = corr_sen_med
+{txt}  4{com}. {c )-}
+{txt}
+{com}. 
+. * Collapse 
+. collapse        (max) algo_ppv algo_sen /// Uncorrected
+>                         (p50) corr_ppv_med corr_sen_med /// best estimate % algo-pos
+>                         (min) corr_ppv_min corr_sen_min /// 0% algo-pos
+>                         (max) corr_ppv_max corr_sen_max /// 100% algo-pos 
+>                         , by(algoname move_n)
+{txt}
+{com}. 
+. 
+. *** Format for table 
+. global format = `"*100, 0.1), "%4.1f" "' // Percent with 1 digit
+{txt}
+{com}. local varlist = ""
+{txt}
+{com}. 
+. * Generate corrected column vars
+. levelsof move_n, local(nmove)
+{res}{txt}74 328
+
+{com}. reshape wide corr_*, i(algoname) j(move_n)
+{txt}(note: j = 74 328)
+
+Data{col 36}long{col 43}->{col 48}wide
+{hline 77}
+Number of obs.                 {res}      42   {txt}->{res}      21
+{txt}Number of variables            {res}      10   {txt}->{res}      15
+{txt}j variable (2 values)            {res}move_n   {txt}->   (dropped)
+xij variables:
+                           {res}corr_ppv_med   {txt}->   {res}corr_ppv_med74 corr_ppv_med328
+                           corr_sen_med   {txt}->   {res}corr_sen_med74 corr_sen_med328
+                           corr_ppv_min   {txt}->   {res}corr_ppv_min74 corr_ppv_min328
+                           corr_sen_min   {txt}->   {res}corr_sen_min74 corr_sen_min328
+                           corr_ppv_max   {txt}->   {res}corr_ppv_max74 corr_ppv_max328
+                           corr_sen_max   {txt}->   {res}corr_sen_max74 corr_sen_max328
+{txt}{hline 77}
+
+{com}. 
+. foreach n of local nmove {c -(}
+{txt}  2{com}.         foreach var in ppv sen {c -(}
+{txt}  3{com}.                 gen `var'_`n' = ///
+>                           string(round(corr_`var'_med`n' $format ) ///
+>                         + " (" ///
+>                         + string(round(corr_`var'_min`n' $format ) ///
+>                         + "-" ///
+>                         + string(round(corr_`var'_max`n' $format ) ///
+>                         + ")"
+{txt}  4{com}.                 local varlist = "`varlist' `var'_`n'"
+{txt}  5{com}.         {c )-}
+{txt}  6{com}.         
+. {c )-}
+{txt}
+{com}. 
+. * Format uncorrected estimates
+. gen ppv_uncorrected = string(round(algo_ppv $format )
+{txt}
+{com}. gen sen_uncorrected = string(round(algo_sen $format )
+{txt}
+{com}. 
+. * Sort and algo name
+. gen sort = _n
+{txt}
+{com}. decode algoname, gen(algorithm) 
+{txt}
+{com}. 
+. * Save data
+. save OutputData/corrected_table.dta, replace
+{txt}file OutputData/corrected_table.dta saved
+
+{com}. export delimited using OutputData/corrected_table.csv, replace delim(tab)
+{res}{txt}file OutputData/corrected_table.csv saved
+
+{com}. 
+. 
+. *** Export table as word doc
+. capture: frame drop table
+{txt}
+{com}. frame put sort algorithm ppv_uncorrected sen_uncorrected `varlist', into(table)
+{txt}
+{com}. 
+. frame table {c -(}
+.     ** Add column headers to table
+.         * Column header (PPV and compleness)
+.         qui: count
+.         local n = `r(N)'+1
+.         set obs `n'
+{txt}{p}
+number of observations (_N)  was 21,
+now 22
+{p_end}
+{com}.         recode sort (.=0)
+{txt}(sort: 1 changes made)
+{com}.         
+.         * Column superheader (Nmove)
+.         local n = `n'+1
+.         set obs `n'
+{txt}{p}
+number of observations (_N)  was 22,
+now 23
+{p_end}
+{com}.         recode sort (.=-1)
+{txt}(sort: 1 changes made)
+{com}. 
+.         sort sort
+. 
+.         * Rename 
+.         foreach var in uncorrected `nmove' {c -(}
+{txt}  2{com}.                 replace ppv_`var' = proper("`var'") if sort==-1
+{txt}  3{com}.                 replace ppv_`var' = "PPV, %" if sort==0
+{txt}  4{com}.                 replace sen_`var' = "Completeness, %" if sort==0
+{txt}  5{com}.         {c )-}
+{txt}variable {bf}ppv_uncorrected{sf} was {bf}{res}str4{sf}{txt} now {bf}{res}str11{sf}
+{txt}(1 real change made)
+(1 real change made)
+variable {bf}sen_uncorrected{sf} was {bf}{res}str4{sf}{txt} now {bf}{res}str15{sf}
+{txt}(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+(1 real change made)
+{com}.         
+.         ** Export to word
+.         putdocx clear
+{res}{com}.         putdocx begin, landscape
+{res}{com}.         putdocx paragraph
+{res}{com}.         putdocx text ("Table - Uncorrected and corrected PPV and completeness of algorithms with most likely estimates (and possible ranges).")
+{res}{com}.         putdocx table tbl1 = data(algorithm-sen_328)
+{res}{com}.         putdocx paragraph
+{res}{com}.         putdocx text ("Notes: Most likely estimate is based on the assumption that the average (uncorrected) PPV of algorithms for T1DM patients in the EPICOM cohort applies to T1DM patients not included the EPICOM study. Ranges refers to range from worst possible case (0% of non-EPICOM T1DM patients are algorithm positive) to best possible case (up to 100% of non-EPICOM T1DM patients are algorithm positive).")
+{res}{com}.         putdocx save OutputTables/TabCorrected, replace
+{res}successfully replaced {browse "C:/Users/au335571/Forskning/2020-T1DM-algorithm-QBA/OutputTables/TabCorrected.docx":"C:/Users/au335571/Forskning/2020-T1DM-algorithm-QBA/OutputTables/TabCorrected.docx"}
+{com}. {c )-}
+{txt}
+{com}. 
+. frame drop table
+{txt}
+{com}. 
+{txt}end of do-file
+
+{com}. 
+. 
+. log close
+      {txt}name:  {res}<unnamed>
+       {txt}log:  {res}C:\Users\au335571\Forskning\2020-T1DM-algorithm-QBA\log_28 Feb 2021.smcl
+  {txt}log type:  {res}smcl
+ {txt}closed on:  {res}28 Feb 2021, 17:26:53
+{txt}{.-}
+{smcl}
+{txt}{sf}{ul off}
