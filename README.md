@@ -10,7 +10,9 @@ The purpose of this quantitative bias analysis (QBA) was to determine how using 
 The assumptions behind the QBA are briefly mentioned in comments within the code. Please see the published manuscript and supplementary for more details on the EPICOM cohort, the purpose of the QBA, and the assumptions behind the QBA.
 
 ### Instructions
-Run 0_master.do to reproduce QBA analysis (data, figures and tables). Requires Stata Statistical Software to run. Developed in Stata version 16.1. 
+Run 0_master.do to reproduce QBA analysis. Requires Stata Statistical Software to run. Developed in Stata version 16.1. 
+
+Output of the code can be found in the log file and in the respective output folders (data, figures and tables).
 
 ### Dependencies
 Code requires the [*grstyle*](http://repec.sowi.unibe.ch/stata/grstyle/index.html) package for creating graphs. 
